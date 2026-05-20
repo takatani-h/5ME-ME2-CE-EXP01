@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  default:
+    deps: [windows, linux, macos]
+
+  windows:
+    env:
+      GOOS: windows
+      GOARCH: amd64
+    cmds:
+      - mkdir -p dist
+      - go build -o dist/roller485-pi-windows-amd64.exe .
+
+  linux:
+    env:
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - mkdir -p dist
+      - go build -o dist/roller485-pi-linux-amd64 .
+
+  macos:
+    env:
+      GOOS: darwin
+      GOARCH: arm64
+    cmds:
+      - mkdir -p dist
+      - go build -o dist/roller485-pi-darwin-arm64 .
