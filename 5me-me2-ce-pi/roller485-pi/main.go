@@ -16,7 +16,7 @@ import (
 	"go.bug.st/serial"
 )
 
-type row struct{ t, speed, current float64 }
+type row struct{ t, omegaRef, speed, currentCmd, currentMeas float64 }
 
 var saveDir string
 
@@ -36,6 +36,17 @@ func promptInt(label string) int {
 			return n
 		}
 		fmt.Println("整数で入力してください")
+	}
+}
+
+func promptFloat(label string) float64 {
+	for {
+		s := prompt(label)
+		v, err := strconv.ParseFloat(s, 64)
+		if err == nil {
+			return v
+		}
+		fmt.Println("数値で入力してください")
 	}
 }
 
@@ -127,9 +138,11 @@ loop:
 	// 計測ループ
 	for {
 		fmt.Println()
-		iPre  := promptInt("I_pre  [mA]")
-		iStep := promptInt("I_step [mA]")
-		tHold := promptInt("T_hold [ms]")
+		kp        := promptFloat("Kp")
+		ki        := promptFloat("Ki")
+		omegaPre  := promptInt("omega_pre  [RPM]")
+		omegaStep := promptInt("omega_step [RPM]")
+		tHold     := promptInt("T_hold     [ms]")
 
 		filename := filepath.Join(saveDir, time.Now().Format("20060102150405")+".csv")
 		f, err := os.Create(filename)
@@ -142,7 +155,7 @@ loop:
 		if err := port.ResetInputBuffer(); err != nil {
 			log.Printf("バッファクリアエラー: %v", err)
 		}
-		fmt.Fprintf(port, "%d %d %d\n", iPre, iStep, tHold)
+		fmt.Fprintf(port, "%g %g %d %d %d\n", kp, ki, omegaPre, omegaStep, tHold)
 		data := collectData(lines, f, time.Duration(2*tHold+500)*time.Millisecond)
 		f.Close()
 		fmt.Printf("保存: %s\n", filename)
@@ -168,12 +181,14 @@ func collectData(lines <-chan string, f *os.File, duration time.Duration) []row 
 		case line := <-lines:
 			fmt.Fprintln(f, line)
 			parts := strings.Split(line, ",")
-			if len(parts) == 3 {
-				t, e1 := strconv.ParseFloat(parts[0], 64)
-				s, e2 := strconv.ParseFloat(parts[1], 64)
-				c, e3 := strconv.ParseFloat(parts[2], 64)
-				if e1 == nil && e2 == nil && e3 == nil {
-					data = append(data, row{t, s, c})
+			if len(parts) == 5 {
+				t,    e1 := strconv.ParseFloat(parts[0], 64)
+				ref,  e2 := strconv.ParseFloat(parts[1], 64)
+				s,    e3 := strconv.ParseFloat(parts[2], 64)
+				cmd,  e4 := strconv.ParseFloat(parts[3], 64)
+				meas, e5 := strconv.ParseFloat(parts[4], 64)
+				if e1 == nil && e2 == nil && e3 == nil && e4 == nil && e5 == nil {
+					data = append(data, row{t, ref, s, cmd, meas})
 				}
 			}
 		case <-deadline:

@@ -25,12 +25,24 @@ func savePlot(csvName string, data []row) {
 	fill(img, color.RGBA{255, 255, 255, 255})
 
 	halfH := imgH / 2
-	blue := color.RGBA{31, 119, 180, 255}
-	red  := color.RGBA{214, 39, 40, 255}
+	blue   := color.RGBA{31, 119, 180, 255}
+	red    := color.RGBA{214, 39, 40, 255}
+	gray   := color.RGBA{160, 160, 160, 255}
+	orange := color.RGBA{255, 152, 80, 255}
 
 	minT, maxT := data[0].t, data[len(data)-1].t
-	minS, maxS := minmax(data, func(r row) float64 { return r.speed })
-	minC, maxC := minmax(data, func(r row) float64 { return r.current })
+	// 上半分: omega_ref と speed を同一スケールで描画
+	minS1, maxS1 := minmax(data, func(r row) float64 { return r.omegaRef })
+	minS2, maxS2 := minmax(data, func(r row) float64 { return r.speed })
+	minS, maxS := minS1, maxS1
+	if minS2 < minS { minS = minS2 }
+	if maxS2 > maxS { maxS = maxS2 }
+	// 下半分: current_cmd と current_meas を同一スケールで描画
+	minC1, maxC1 := minmax(data, func(r row) float64 { return r.currentCmd })
+	minC2, maxC2 := minmax(data, func(r row) float64 { return r.currentMeas })
+	minC, maxC := minC1, maxC1
+	if minC2 < minC { minC = minC2 }
+	if maxC2 > maxC { maxC = maxC2 }
 
 	scaleX := func(t float64) int {
 		return margin + int((t-minT)/(maxT-minT)*float64(imgW-2*margin))
@@ -44,10 +56,16 @@ func savePlot(csvName string, data []row) {
 
 	for i := 1; i < len(data); i++ {
 		p, q := data[i-1], data[i]
+		// 上段: ref → speed の順 (主役の speed を上に乗せる)
+		drawLine(img, scaleX(p.t), scaleY(p.omegaRef, minS, maxS, 0, halfH),
+			scaleX(q.t), scaleY(q.omegaRef, minS, maxS, 0, halfH), gray)
 		drawLine(img, scaleX(p.t), scaleY(p.speed, minS, maxS, 0, halfH),
 			scaleX(q.t), scaleY(q.speed, minS, maxS, 0, halfH), blue)
-		drawLine(img, scaleX(p.t), scaleY(p.current, minC, maxC, halfH, halfH),
-			scaleX(q.t), scaleY(q.current, minC, maxC, halfH, halfH), red)
+		// 下段: cmd → meas の順
+		drawLine(img, scaleX(p.t), scaleY(p.currentCmd, minC, maxC, halfH, halfH),
+			scaleX(q.t), scaleY(q.currentCmd, minC, maxC, halfH, halfH), orange)
+		drawLine(img, scaleX(p.t), scaleY(p.currentMeas, minC, maxC, halfH, halfH),
+			scaleX(q.t), scaleY(q.currentMeas, minC, maxC, halfH, halfH), red)
 	}
 
 	pngName := strings.TrimSuffix(csvName, ".csv") + ".png"
